@@ -71,12 +71,19 @@ class PipeJS {
             // Create a template for the global object.
             v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(this->isolate);
 
+            SSLHandler sslHandler;
+            sslHandler.init();
+
+            Tcp tcp;
+            tcp.connect(DEFAULT_LOOP, &sslHandler);
+
             Timer timer;
             timer.Init(DEFAULT_LOOP);
 
             // Bind my custom functions
-            global->Set(isolate, "mPrint", v8::FunctionTemplate::New(isolate, MPrint));
-            global->Set(isolate, "mTimeout", v8::FunctionTemplate::New(isolate, timer.Timeout));
+            global->Set(isolate, "print", v8::FunctionTemplate::New(isolate, MPrint));
+            global->Set(isolate, "timeout", v8::FunctionTemplate::New(isolate, timer.Timeout));
+            global->Set(isolate, "fetch", v8::FunctionTemplate::New(isolate, Fetch));
 
             // Create a new context.
             this->context = v8::Context::New(this->isolate, NULL, global);

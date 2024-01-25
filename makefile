@@ -10,7 +10,7 @@ define INCLUDEUV
 endef
 
 define SRC
-	pipejs/index.cc
+	pipejs/index.cpp
 endef
 
 define DEP
@@ -27,7 +27,11 @@ export DEP
 
 build:
 	mkdir -p bin
-	$(CXX) $$SRC -I $$INCLUDE -I $$INCLUDEUV -std=c++17 -pthread -o $$OUTPUT_FILE $< -DV8_COMPRESS_POINTERS -DV8_ENABLE_SANDBOX $$DEP -Wl,--no-as-needed -ldl
+	$(CXX) $$SRC -I $$INCLUDE -I $$INCLUDEUV -std=c++17 -pthread -o $$OUTPUT_FILE $< -DV8_COMPRESS_POINTERS -DV8_ENABLE_SANDBOX $$DEP -Wl,--no-as-needed -ldl -lcrypto -lssl
+
+build_g:
+	mkdir -p bin
+	$(CXX) -g $$SRC -I $$INCLUDE -I $$INCLUDEUV -std=c++17 -pthread -o $$OUTPUT_FILE $< -DV8_COMPRESS_POINTERS -DV8_ENABLE_SANDBOX $$DEP -Wl,--no-as-needed -ldl -lcrypto -lssl
 
 run:
 	./bin/pipejs ./test.js

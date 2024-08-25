@@ -19,7 +19,7 @@ struct Client {
   BIO* writeBio;
 };
 
-class Tcp {
+class TCPHandler {
   private:
     Client client;
 
@@ -42,7 +42,7 @@ class Tcp {
         fprintf(stderr, "error onWriteEnd");
         return;
       }
-      uv_read_start(req->handle, Tcp::onAllocCallback, Tcp::echoRead);
+      uv_read_start(req->handle, TCPHandler::onAllocCallback, TCPHandler::echoRead);
     }
 
     static void writeToSocket(Client* c, char* buf, size_t len) {
@@ -54,7 +54,7 @@ class Tcp {
       uvbuf.base = buf;
       uvbuf.len = len;
   
-      int r = uv_write(&c->writeReq, (uv_stream_t*)&c->socket, &uvbuf, 1, Tcp::onWriteEnd);
+      int r = uv_write(&c->writeReq, (uv_stream_t*)&c->socket, &uvbuf, 1, TCPHandler::onWriteEnd);
       if (r < 0) {
         printf("ERROR: writeToSocket error: ");
       }
@@ -64,7 +64,7 @@ class Tcp {
       char buf[5000*16]; // TODO: check this values before
       int bytesRead = 0;
       while((bytesRead = BIO_read(c->writeBio, buf, sizeof(buf))) > 0) {
-        Tcp::writeToSocket(c, buf, bytesRead);
+        TCPHandler::writeToSocket(c, buf, bytesRead);
       }
     }
 
@@ -74,7 +74,7 @@ class Tcp {
           std::copy(c->bufferOut.begin(), c->bufferOut.end(), std::ostream_iterator<char>(std::cout,""));
           int sslWriteResponse = SSL_write(c->ssl, &c->bufferOut[0], c->bufferOut.size());
           c->bufferOut.clear();
-          Tcp::flushReadBio(c);
+          TCPHandler::flushReadBio(c);
         }
       }
     }
@@ -83,7 +83,8 @@ class Tcp {
       int error = SSL_get_error(c->ssl, result);
 
       if (error == SSL_ERROR_WANT_READ) { // wants to read from bio
-        Tcp::flushReadBio(c);
+        printf("%d WANT READ", 3);
+        TCPHandler::flushReadBio(c);
       }
       if (error == SSL_ERROR_SSL) {
         printf("## SSL Error %d \n", error);
@@ -97,11 +98,11 @@ class Tcp {
       if (!SSL_is_init_finished(c->ssl)) {
         int sslConnectResponse = SSL_connect(c->ssl);
         if (sslConnectResponse < 0) {
-          Tcp::handleError(c, sslConnectResponse); // TODO: Improve error handle
+          TCPHandler::handleError(c, sslConnectResponse); // TODO: Improve error handle
           printf("ERROR: init on_event 1 %d \n", sslConnectResponse);
         }
 
-        Tcp::checkOutgoingApplicationData(c);
+        TCPHandler::checkOutgoingApplicationData(c);
       } else {
         // connect, check if there is encrypted data, or we need to send app data
         int sslReadResponse = SSL_read(c->ssl, buf, sizeof(buf));
@@ -113,7 +114,7 @@ class Tcp {
           c->bufferIn.clear();
         }
 
-        Tcp::checkOutgoingApplicationData(c);
+        TCPHandler::checkOutgoingApplicationData(c);
       }
     }
 
@@ -124,7 +125,7 @@ class Tcp {
       }
 
       BIO_write(c->readBio, buf->base, nread);
-      Tcp::onSocketEvent(c);
+      TCPHandler::onSocketEvent(c);
     }
 
     static void onConnectCallback(uv_connect_t* con, int status) {
@@ -134,7 +135,7 @@ class Tcp {
         ::exit(0);
       }
 
-      int r = uv_read_start((uv_stream_t*)&c->socket, Tcp::onAllocCallback, Tcp::onReadCallback);
+      int r = uv_read_start((uv_stream_t*)&c->socket, TCPHandler::onAllocCallback, TCPHandler::onReadCallback);
       if (r == -1) {
         printf("ERROR: uv_read_start \n");
         ::exit(0);
@@ -144,8 +145,12 @@ class Tcp {
       const char* httpRequestTemplate = "" \
         "GET %s HTTP/1.1\r\n"
         "Host: %s\r\n"
-        "User-Agent: PostmanRuntime/7.36.1\r\n"
-        "Accept: */*\r\n"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36\r\n" // Just for testing
+        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7\r\n"
+        "Accept-Encoding: gzip, deflate, br, zstd\r\n"
+        "Accept-Language: en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7\r\n"
+        "Sec-Ch-Ua: ""Not)A;Brand\";v=\"99\", \"Google Chrome\";v=\"127\",\r\n"
+        "Cache-Control: max-age=0\r\n"
         "Connection: close\r\n"
         "\r\n";
 
@@ -162,7 +167,7 @@ class Tcp {
       SSL_set_bio(c->ssl, c->readBio, c->writeBio);
       SSL_set_connect_state(c->ssl);
 
-      Tcp::onSocketEvent(c);
+      TCPHandler::onSocketEvent(c);
     }
 
     static void onResolvedCallback(uv_getaddrinfo_t* resolver, int status, struct addrinfo * res) {
@@ -172,12 +177,12 @@ class Tcp {
         ::exit(0);
       }
 
-      char addr[17] = {'\0'};
+      char addr[128] = {'\0'};
       uv_ip4_name((struct sockaddr_in*) res->ai_addr, addr, 16);
-      // printf("Found host:  %s\n", addr);
 
+      // TCP configs and connection
       uv_tcp_init(c->loop, &c->socket);
-      uv_tcp_connect(&c->connectReq, &c->socket, (const struct sockaddr*)res->ai_addr, Tcp::onConnectCallback);
+      uv_tcp_connect(&c->connectReq, &c->socket, (const struct sockaddr*)res->ai_addr, TCPHandler::onConnectCallback);
       uv_freeaddrinfo(res);
     }
 
@@ -193,7 +198,7 @@ class Tcp {
       uv_getaddrinfo(
         this->client.loop,
         &resolver,
-        Tcp::onResolvedCallback,
+        TCPHandler::onResolvedCallback,
         this->client.host,
         this->client.port,
         &hints
@@ -203,16 +208,16 @@ class Tcp {
     }
 
   public:
-    void connect(uv_loop_t* loop, SSLHandler* sslHandler) {
+    void connect(uv_loop_t* loop, SSLHandler* sslHandler, URL url) {
       this->client.loop = loop;
       this->client.connectReq.data = &client;
       this->client.socket.data = &client;
       this->client.ssl = NULL;
       this->client.sslCTX = sslHandler->getCTX();
 
-      sprintf(this->client.host, "%s", "seguro.catho.com.br");
+      sprintf(this->client.host, "%s", "www.github.com");
       sprintf(this->client.port, "%s", "443");
-      sprintf(this->client.page, "%s", "/vagas/vagas-api/role/?keywords=pedreiro");
+      sprintf(this->client.page, "%s", "/");
 
       this->resolveHost();
     }

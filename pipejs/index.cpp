@@ -15,13 +15,17 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 
+uv_loop_t *DEFAULT_LOOP = uv_default_loop();
+
+#include "./networking/sslHandler.hpp"
+#include "./networking/url.hpp"
+#include "./networking/tcpHandler.hpp"
 #include "./helpers/strings.hpp"
 #include "./helpers/file-manager.hpp"
 #include "./custom-functions/print.hpp"
 #include "./custom-functions/timer.hpp"
 #include "./custom-functions/fetch.hpp"
-#include "./networking/SSLHandler.hpp"
-#include "./networking/tcp.hpp"
+
 #include "./pipejs.hpp"
 
 int main(int argc, char* argv[]) {

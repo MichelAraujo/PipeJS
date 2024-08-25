@@ -1,6 +1,4 @@
 
-uv_loop_t *DEFAULT_LOOP = uv_default_loop();
-
 class PipeJS {
     private:
         v8::Isolate *isolate;
@@ -71,12 +69,6 @@ class PipeJS {
             // Create a template for the global object.
             v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(this->isolate);
 
-            SSLHandler sslHandler;
-            sslHandler.init();
-
-            Tcp tcp;
-            tcp.connect(DEFAULT_LOOP, &sslHandler);
-
             Timer timer;
             timer.Init(DEFAULT_LOOP);
 
@@ -87,7 +79,7 @@ class PipeJS {
 
             // Create a new context.
             this->context = v8::Context::New(this->isolate, NULL, global);
-            
+
             ExecuteScriptAndWaitForEvents(filename);
         }
 
